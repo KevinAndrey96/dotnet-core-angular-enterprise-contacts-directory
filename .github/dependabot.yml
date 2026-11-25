@@ -1,0 +1,20 @@
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/Backend"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "npm"
+    directory: "/Frontend"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "@angular*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@angular-devkit/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@babel/*"
+        update-types: ["version-update:semver-major"]
