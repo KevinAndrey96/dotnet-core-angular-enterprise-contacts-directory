@@ -1,9 +1,7 @@
 import { Component, OnInit } from '@angular/core';
-import {User} from "../../models/User"
-import {Login} from "../../models/Login"
-import { NgForm } from '@angular/forms'
-import { ContactsService } from '../../service/contacts.service'
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
+import { AuthService } from '../../service/auth.service';
+import { Login } from '../../models/Login';
 
 @Component({
   selector: 'app-login',
@@ -11,33 +9,46 @@ import { Router } from '@angular/router';
   styleUrls: ['./login.component.css']
 })
 export class LoginComponent implements OnInit {
-  token;
- 
-  login1: Login = {
-    Username:"",
-    Pass:""
-  }
-  constructor(private contactsService: ContactsService, private router:Router) { }
- 
-  ngOnInit(): void {  
+  credentials: Login = {
+    Username: 'kaherrera@hubbec.com',
+    Pass: 'Password123!'
+  };
 
-  }
+  loading: boolean = false;
+  errorMessage: string | null = null;
+  returnUrl: string = '/dashboard';
 
-  login3(): void {
-    //this.login1.Username = this.user.email
-    //this.login1.Pass = this.user.password 
-    this.contactsService.login(this.login1)
-      .subscribe(
-        res => {
-          console.log(res);
-          
-          localStorage.setItem('auth_token', res["token"]);
-          this.router.navigate(['dashboard']);
-          //console.log(res["token"]);
-        },
-        err => console.log("Error:"+ err)
-      );
+  constructor(
+    private authService: AuthService,
+    private router: Router,
+    private route: ActivatedRoute
+  ) {}
 
+  ngOnInit(): void {
+    if (this.authService.isLoggedIn()) {
+      this.router.navigate(['/dashboard']);
+    }
+    this.returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
   }
 
+  onSubmit(): void {
+    if (!this.credentials.Username || !this.credentials.Pass) {
+      this.errorMessage = 'Por favor ingrese su correo y contrase\u00f1a.';
+      return;
+    }
+
+    this.loading = true;
+    this.errorMessage = null;
+
+    this.authService.login(this.credentials).subscribe({
+      next: (res) => {
+        this.loading = false;
+        this.router.navigateByUrl(this.returnUrl);
+      },
+      error: (err) => {
+        this.loading = false;
+        this.errorMessage = err.error?.alert || err.error?.message || 'Error al iniciar sesi\u00f3n. Verifique sus credenciales.';
+      }
+    });
+  }
 }

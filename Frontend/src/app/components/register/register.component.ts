@@ -1,41 +1,72 @@
 import { Component, OnInit } from '@angular/core';
-import {User} from "../../models/User"
-import { ContactsService } from '../../service/contacts.service'
+import { Router } from '@angular/router';
+import { AuthService } from '../../service/auth.service';
+import { User } from '../../models/User';
 
 @Component({
   selector: 'app-register',
   templateUrl: './register.component.html',
   styleUrls: ['./register.component.css']
 })
-
 export class RegisterComponent implements OnInit {
-  user1: User = {
+  user: User = {
     firstName: '',
     lastName: '',
-    documentType: '',
+    documentType: 'CC',
     documentNumber: '',
     phone: '',
     email: '',
-    password: '',
+    password: ''
   };
-  constructor(private contactsService: ContactsService) { }
+
+  confirmPassword: string = '';
+  loading: boolean = false;
+  errorMessage: string | null = null;
+  infoMessage: string | null = null;
+
+  constructor(
+    private authService: AuthService,
+    private router: Router
+  ) {}
 
   ngOnInit(): void {
+    if (this.authService.isLoggedIn()) {
+      this.router.navigate(['/dashboard']);
+    }
   }
 
-  
-  user3(): void {
-    //this.login1.Username = this.user.email
-    //this.login1.Pass = this.user.password 
-    console.log(this.user1)
-    this.contactsService.register(this.user1)
-      .subscribe(
-        res => {
-          console.log(res);
-        },
-        err => console.log("Error:"+ err.message)
-      );
+  onSubmit(): void {
+    this.errorMessage = null;
+    this.infoMessage = null;
 
+    if (!this.user.firstName || !this.user.lastName || !this.user.documentNumber || !this.user.phone || !this.user.email || !this.user.password) {
+      this.errorMessage = 'Por favor complete todos los campos obligatorios.';
+      return;
+    }
+
+    if (this.user.password !== this.confirmPassword) {
+      this.errorMessage = 'Las contrase\u00f1as no coinciden.';
+      return;
+    }
+
+    this.loading = true;
+
+    this.authService.register(this.user).subscribe({
+      next: (res) => {
+        this.loading = false;
+        if (res && res.registeredByMessage) {
+          this.infoMessage = res.registeredByMessage;
+          setTimeout(() => {
+            this.router.navigate(['/dashboard']);
+          }, 3500);
+        } else {
+          this.router.navigate(['/dashboard']);
+        }
+      },
+      error: (err) => {
+        this.loading = false;
+        this.errorMessage = err.error?.alert || err.error?.message || 'Error durante el registro. Intente con otro correo o documento.';
+      }
+    });
   }
-
 }

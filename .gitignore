@@ -1,0 +1,49 @@
+# OS Files
+.DS_Store
+Thumbs.db
+*.swp
+*.bak
+
+# .NET Core / C# / Visual Studio
+bin/
+obj/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+.vs/
+.vscode/
+.idea/
+*.rsuser
+*.suo
+*.sln.docstates
+*.nupkg
+*.snupkg
+packages/
+*.DotSettings.user
+appsettings.local.json
+*.db
+*.db-shm
+*.db-wal
+
+# Node / Angular
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.angular/
+dist/
+tmp/
+out-tsc/
+bazel-out/
+.sass-cache/
+connect.lock
+coverage/
+libpeerconnection.log
+testem.log
+typings/
+
+# Environment
+.env
+.env.local
+.env.*.local

@@ -1,17 +1,16 @@
 import { NgModule } from '@angular/core';
 import { Routes, RouterModule } from '@angular/router';
 
-
 import { LoginComponent } from './components/login/login.component';
 import { RegisterComponent } from './components/register/register.component';
 import { DashboardComponent } from './components/dashboard/dashboard.component';
-import { ContactComponent } from './components/contact/contact.component'
-
+import { ContactComponent } from './components/contact/contact.component';
+import { AuthGuard } from './guards/auth.guard';
 
 const routes: Routes = [
   {
     path: '',
-    redirectTo: '/login',
+    redirectTo: '/dashboard',
     pathMatch: 'full'
   },
   {
@@ -24,11 +23,17 @@ const routes: Routes = [
   },
   {
     path: 'dashboard',
-    component: DashboardComponent
+    component: DashboardComponent,
+    canActivate: [AuthGuard]
   },
   {
     path: 'contact',
-    component: ContactComponent
+    component: ContactComponent,
+    canActivate: [AuthGuard]
+  },
+  {
+    path: '**',
+    redirectTo: '/dashboard'
   }
 ];
 

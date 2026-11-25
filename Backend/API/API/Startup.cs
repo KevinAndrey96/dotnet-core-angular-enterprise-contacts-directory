@@ -1,20 +1,17 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using API.Middleware;
 using API.Models;
+using API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 
 namespace API
 {
@@ -27,20 +24,19 @@ namespace API
 
         public IConfiguration Configuration { get; }
 
-        // This method gets called by the runtime. Use this method to add services to the container.
-        readonly string MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
         public void ConfigureServices(IServiceCollection services)
         {
-
-            services.AddCors(o => o.AddPolicy("MyPolicy", builder =>
+            // 1. CORS Policy
+            services.AddCors(o => o.AddPolicy("AllowAll", builder =>
             {
                 builder.AllowAnyOrigin()
                        .AllowAnyMethod()
                        .AllowAnyHeader();
             }));
 
-
-            var key = Encoding.ASCII.GetBytes(Configuration.GetValue<string>("SecretKey"));
+            // 2. JWT Bearer Authentication
+            string secretKey = Configuration.GetValue<string>("SecretKey") ?? "DefaultSuperSecretKeyForContactsDirectory2026";
+            var key = Encoding.ASCII.GetBytes(secretKey);
 
             services.AddAuthentication(x =>
             {
@@ -55,28 +51,108 @@ namespace API
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(key),
                     ValidateIssuer = false,
-                    ValidateAudience = false
+                    ValidateAudience = false,
+                    ClockSkew = TimeSpan.Zero
                 };
             });
-            //services.UseCors("AllowAnyOrigin");
-            services.AddRazorPages();
-            string connectionString = Configuration.GetConnectionString("DefaultConnection");
-            services.AddDbContext<UserContext>(opt => 
-            opt.UseSqlServer(connectionString));
-            services.AddControllers();
-        }
 
-        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
-        {
+            // 3. Database Provider (SQLite default for universal portability, or SQL Server)
+            string provider = Configuration.GetValue<string>("DatabaseProvider") ?? "Sqlite";
+            string connectionString = Configuration.GetConnectionString("DefaultConnection") 
+                ?? Configuration.GetConnectionString("SqliteConnection") 
+                ?? "Data Source=directory.db";
 
-            app.UseCors("MyPolicy");
-            if (env.IsDevelopment())
+            if (provider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
             {
-                app.UseDeveloperExceptionPage();
+                services.AddDbContext<UserContext>(opt => opt.UseSqlServer(connectionString));
+            }
+            else
+            {
+                services.AddDbContext<UserContext>(opt => opt.UseSqlite(connectionString));
             }
 
-            app.UseHttpsRedirection();
+            // 4. Domain Services Dependency Injection
+            services.AddSingleton<IMongoLogService, MongoLogService>();
+            services.AddScoped<IAuthService, AuthService>();
+            services.AddScoped<IContactService, ContactService>();
+
+            // 5. Controllers
+            services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.PropertyNamingPolicy = null;
+                });
+
+            // 6. Swagger / OpenAPI Documentation
+            services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc("v1", new OpenApiInfo
+                {
+                    Title = "Contacts Directory Enterprise API",
+                    Version = "v1",
+                    Description = "RESTful API built with ASP.NET Core, EF Core, SQL Server/SQLite, and MongoDB Exception Logging. Developed for Hubbec Fullstack Challenge.",
+                    Contact = new OpenApiContact
+                    {
+                        Name = "Kevin Andrey Herrera Silva",
+                        Email = "kahs_kevin@hotmail.com",
+                        Url = new Uri("https://github.com/KevinAndrey96")
+                    }
+                });
+
+                c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+                    Name = "Authorization",
+                    In = ParameterLocation.Header,
+                    Type = SecuritySchemeType.ApiKey,
+                    Scheme = "Bearer"
+                });
+
+                c.AddSecurityRequirement(new OpenApiSecurityRequirement
+                {
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            }
+                        },
+                        Array.Empty<string>()
+                    }
+                });
+            });
+        }
+
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, UserContext dbContext)
+        {
+            // Auto-create database schema and seed sample demo data
+            try
+            {
+                dbContext.Database.EnsureCreated();
+                dbContext.SeedInitialData();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Database initialization notice: {ex.Message}");
+            }
+
+            app.UseCors("AllowAll");
+
+            // Global Exception Interception Middleware (Logs to MongoDB)
+            app.UseMiddleware<GlobalExceptionMiddleware>();
+
+            if (env.IsDevelopment() || true)
+            {
+                app.UseDeveloperExceptionPage();
+                app.UseSwagger();
+                app.UseSwaggerUI(c =>
+                {
+                    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Contacts Directory API v1");
+                    c.RoutePrefix = "swagger";
+                });
+            }
 
             app.UseRouting();
 
@@ -86,6 +162,10 @@ namespace API
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();
+                endpoints.MapGet("/", async context =>
+                {
+                    context.Response.Redirect("/swagger");
+                });
             });
         }
     }

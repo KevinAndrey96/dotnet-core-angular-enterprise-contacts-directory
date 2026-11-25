@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: contacts-directory-api
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - DatabaseProvider=Sqlite
+      - ConnectionStrings__SqliteConnection=Data Source=/app/data/directory.db
+      - ConnectionStrings__MongoConnection=mongodb://mongodb:27017
+      - MongoConnectionString=mongodb://mongodb:27017
+      - MongoDatabaseName=DirectoryLogs
+      - SecretKey=EnterpriseSuperSecretJwtKeyForDirectoryServices2026!
+    volumes:
+      - backend-data:/app/data
+    depends_on:
+      - mongodb
+    networks:
+      - contacts-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: contacts-directory-web
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+    networks:
+      - contacts-network
+
+  mongodb:
+    image: mongo:6.0
+    container_name: contacts-directory-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - contacts-network
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: contacts-directory-mongo-ui
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongodb
+      - ME_CONFIG_MONGODB_PORT=27017
+      - ME_CONFIG_BASICAUTH=false
+    depends_on:
+      - mongodb
+    networks:
+      - contacts-network
+
+networks:
+  contacts-network:
+    driver: bridge
+
+volumes:
+  backend-data:
+  mongo-data:
